@@ -1,58 +1,26 @@
 {
-  "name": "ai-manga-studio",
-  "private": true,
+  "name": "printfilm",
   "version": "0.1.0",
-  "type": "module",
-  "main": "electron/main.cjs",
+  "private": true,
+  "description": "AI 短剧 SaaS 平台 - 画布工作流 + 多模型视频生成",
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
   "scripts": {
-    "dev": "vite",
-    "build": "vite build",
-    "preview": "vite preview",
-    "electron:dev": "npm run build && electron .",
-    "electron:build": "npm run build && electron-builder",
-    "electron:build:win": "npm run build && electron-builder --win",
-    "electron:build:mac": "npm run build && electron-builder --mac"
+    "dev": "npm run dev --workspace=apps/web",
+    "dev:web": "npm run dev --workspace=apps/web",
+    "build": "npm run build --workspace=apps/web",
+    "build:web": "npm run build --workspace=apps/web",
+    "lint": "npm run lint --workspace=apps/web",
+    "api:dev": "cd services/api && mvn spring-boot:run",
+    "api:build": "cd services/api && mvn -q package -DskipTests",
+    "docker:up": "docker compose up -d",
+    "docker:down": "docker compose down",
+    "start:all": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/start-all.ps1",
+    "stop:all": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/stop-all.ps1"
   },
-  "dependencies": {
-    "express": "^4.21.0",
-    "http-proxy-middleware": "^3.0.0",
-    "jszip": "^3.10.1",
-    "lucide-react": "^0.554.0",
-    "react": "^19.2.0",
-    "react-dom": "^19.2.0"
-  },
-  "devDependencies": {
-    "@types/node": "^22.14.0",
-    "@vitejs/plugin-react": "^5.0.0",
-    "electron": "^33.0.0",
-    "electron-builder": "^25.0.0",
-    "typescript": "~5.8.2",
-    "vite": "^6.2.0"
-  },
-  "build": {
-    "appId": "com.forsearch.ai-manga-studio",
-    "productName": "AI 漫剧工场",
-    "directories": {
-      "output": "release"
-    },
-    "files": [
-      "dist/**",
-      "electron/**"
-    ],
-    "asarUnpack": [
-      "dist/**"
-    ],
-    "win": {
-      "target": ["nsis"],
-      "signAndEditExecutable": false
-    },
-    "nsis": {
-      "oneClick": false,
-      "allowToChangeInstallationDirectory": true
-    },
-    "mac": {
-      "target": ["dmg"],
-      "category": "public.app-category.video"
-    }
+  "engines": {
+    "node": ">=20"
   }
 }

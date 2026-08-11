@@ -1,0 +1,36 @@
+name: printfilm
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: printfilm-postgres
+    environment:
+      POSTGRES_DB: printfilm
+      POSTGRES_USER: printfilm
+      POSTGRES_PASSWORD: printfilm_dev
+    ports:
+      - "7052:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U printfilm -d printfilm"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  redis:
+    image: redis:7-alpine
+    container_name: printfilm-redis
+    ports:
+      - "7053:6379"
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+volumes:
+  postgres_data:
+  redis_data:

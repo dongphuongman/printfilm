@@ -1,0 +1,9 @@
+registry: gcc-registry.cn-hangzhou.cr.aliyuncs.com
+namespace: gcc
+project_name: ai-manju
+compose_file: docker-compose.full.yml
+tag: latest
+
+login:
+  username: ${DOCKER_USERNAME}
+  password: ${DOCKER_PASSWORD}

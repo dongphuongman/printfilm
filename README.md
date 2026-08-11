@@ -1,345 +1,625 @@
-# Print Film  
+# Printfilm · AI 短剧创作平台
 
-[中文介绍](https://github.com/yuanzhongqiao/deep-printfilm/blob/main/README%20-%20cn.md)
+> **版本**：v0.1.0 · **更新日期**：2026-07-17  
+> **代码仓库**：https://www.gitcc.com/yi-ee/ai-manju
 
-AI Comic & Short Drama Studio is an AI creation workspace designed for creators of short dramas, comic dramas, motion comics and film storyboards. It aims to rapidly turn story ideas into previewable, exportable and editable visual assets and video clips.
+Printfilm 是一站式 AI 短剧 SaaS 平台，面向业务用户提供**创作中心、项目管理、短剧生产流水线（DramaForge）、无限画布工作流**等能力，支持通过 TokenFree 与火山方舟 Seedance 调用文生图、文生视频、图生视频等模型。
 
-The project adopts a Script-to-Asset-to-Keyframe workflow: finalize the plot and storyboards first, then generate character and scene assets, followed by creating keyframes and videos in the AI workspace, with unified preview and export at the final stage.
+---
 
-#  Produce  Short Videos | Film By  AI    
+## 目录
 
-Make Moives by AI
+- [1. 产品简介](#1-产品简介)
+- [2. 系统架构](#2-系统架构)
+- [3. 环境要求](#3-环境要求)
+- [4. 本地开发启动](#4-本地开发启动)
+- [5. Docker 部署](#5-docker-部署)
+- [6. AI 模型 API 配置](#6-ai-模型-api-配置)
+- [7. 功能模块说明](#7-功能模块说明)
+- [8. 典型业务流程](#8-典型业务流程)
+- [9. 系统管理](#9-系统管理)
+- [10. 日常运维](#10-日常运维)
+- [11. 常见问题](#11-常见问题)
+- [附录](#附录)
 
+---
 
+## 1. 产品简介
 
-Short videos by AI :  www.printfilm.com
+| 项目 | 说明 |
+|------|------|
+| 产品名称 | **Printfilm**（前端展示名） |
+| 后端服务名 | `printfilm-api` |
+| 适用场景 | AI 短剧策划、分镜、资产生成、镜头视频、合成导出 |
+| 访问方式 | Web 浏览器（推荐 Chrome / Edge 最新版） |
+| 界面语言 | 中文 / English（顶栏切换） |
 
-Films  Moive  and  Drama   use   PrintFilm-Pro
+**核心能力：**
 
-Windows Application OR Website
+- 创作中心：文生视频、图生视频、文生图、文本生成，统一任务列表与预览
+- 项目管理：创建/编辑项目，进入短剧流水线或画布工作流
+- DramaForge 流水线：剧本解析 → 资产设计 → 分镜 → 镜头视频 → 合成导出（SSE 实时进度）
+- 无限画布：React Flow 节点编辑器，支持从流水线同步节点图
+- 管理后台：用户、项目、生成任务统计与审计
 
-Windows : setup file :
+![登录界面](docs/images/image-20260723-login.jpg)
 
-通过网盘分享的文件：AI 漫剧工场 Setup 0.2.0.exe
-链接: https://pan.baidu.com/s/1ZehWgPNtfKFndYgH8PVhHQ 提取码: 2cae 
---来自百度网盘超级会员v4的分享
+---
 
+## 2. 系统架构
 
-# Project Launch
-
-## Local Development
-```bash
-npm install
-npm run dev
 ```
-After startup, access the local address displayed in the terminal. The Vite development environment proxies `/api-proxy` to the GitCC API for local debugging.
-
-
-## Build Production Version
-```bash
-npm run build
-npm run preview
-```
-
-
-## Docker Deployment
-```bash
-docker-compose up -d --build
-docker-compose logs -f
-docker-compose down
-```
-- Access via port **3005** by default.  
-- Compose generates:  
-  - `ai-manga-studio:latest` image  
-  - `ai-manga-studio-app` container  
-  - `ai-manga-studio-network` network  
-- Nginx hosts frontend static files and proxies `/api-proxy` to the GitCC API.
-
-
-## Docker Command Method
-```bash
-docker build -t ai-manga-studio .
-docker run -d -p 3005:80 --name ai-manga-studio-app ai-manga-studio
-docker logs -f ai-manga-studio-app
-docker stop ai-manga-studio-app
-```
-
-
-## Desktop Version
-```bash
-npm run electron:dev
-npm run electron:build
-npm run electron:build:win
-```
-- `electron:dev`: Builds the frontend first, then launches the Electron window.  
-- `electron:build`: Uses `electron-builder` to generate desktop installation packages.  
-- Windows installers are output to the `release/` directory with the product name **AI Manga Studio**.  
-- The desktop version includes a built-in local HTTP server that hosts the frontend and proxies `/api-proxy` to the GitCC API.
-
-
-## Quick Start
-1. After launching the app, fill in your **GitCC API Key** in *Model Configuration*.  
-2. Go to **Phase 01: Plot Creation**: Enter a story idea to generate a script and storyboard.  
-3. Go to **Phase 02: Scene & Characters**: Generate character design sheets, costume variations, and scene images.  
-4. Go to **Phase 03: AI Workbench**: Generate keyframes and video clips one by one.  
-5. Go to **Phase 04: Production & Export**: Preview and download keyframes, videos, and project assets.  
-- To adjust prompts, use **Asset Management** for centralized viewing/editing.
-
-
-## Common Commands
-```bash
-npm install
-npm run dev
-npm run build
-npm run preview
-npm run electron:dev
-npm run electron:build
-docker-compose up -d --build
-docker-compose down
+┌─────────────┐     HTTP/SSE      ┌──────────────────┐
+│  Web 前端    │ ◄──────────────► │  Spring Boot API │
+│  Next.js    │   :7050 / :7051  │  Java 21         │
+└─────────────┘                   └────────┬─────────┘
+                                           │
+                    ┌──────────────────────┼──────────────────────┐
+                    ▼                      ▼                      ▼
+             PostgreSQL 16            Redis 7              本地/OSS 媒体
+               :7052                    :7053                 存储
+                    │
+                    ▼
+        外部 AI：TokenFree（文本/图像）· 火山方舟 Seedance（视频）
 ```
 
-# AI 漫剧工场
+| 模块 | 技术 |
+|------|------|
+| 前端 | Next.js 16、React Flow、Tailwind CSS |
+| 后端 | Spring Boot 3.4、Spring Security + JWT |
+| 数据库 | PostgreSQL 16 |
+| 缓存 | Redis 7 |
+| 容器仓库 | 阿里云 ACR `gcc` 命名空间（业务镜像） |
 
-> **AI 一站式短剧/漫剧生成平台**  
-> *Industrial AI Motion Comic & Video Workbench*
+---
 
+## 3. 环境要求
 
-**AI 漫剧工场** 是一个面向短剧、漫剧、动态漫画与影视分镜创作者的 AI 生产工作台，目标是把故事创意快速转化为可预览、可导出、可继续剪辑的视觉资产与视频片段。
+| 组件 | 版本要求 |
+|------|----------|
+| Node.js | ≥ 20 |
+| npm | ≥ 10（随 Node 安装） |
+| Java | 21 |
+| Maven | 3.9+ |
+| Docker | 24+（部署用） |
+| Docker Compose | v2 |
 
-项目采用 **Script-to-Asset-to-Keyframe** 工作流：先完成剧情与分镜，再生成角色/场景资产，随后在 AI工作台中制作关键帧与视频，最后统一预览和导出。
+---
 
-## 界面展示
+## 4. 本地开发启动
 
-### 项目管理
+### 4.1 端口规划
 
-![项目管理](./images/项目管理.png)
+| 服务 | 端口 | 说明 |
+|------|------|------|
+| Web 前端 | **7050** | Next.js 开发/生产 |
+| API 后端 | **7051** | REST + SSE |
+| PostgreSQL | **7052** | 仅 `docker-compose.yml` 映射 |
+| Redis | **7053** | 仅 `docker-compose.yml` 映射 |
 
-### Phase 01: 剧情创作
+### 4.2 方式一：一键启动（Windows 推荐）
 
-![剧本创作](./images/剧本创作.png)
-![剧情创作](./images/剧本与故事.png)
+```bash
+# 启动 Docker + API + Web，并打开浏览器
+start.bat
 
-### Phase 02: 场景角色
+# 停止服务
+stop.bat
+```
 
-![角色场景](./images/角色场景.png)
-![场景](./images/场景.png)
+等效命令：
 
-### Phase 03: AI工作台
+```bash
+npm run start:all
+npm run stop:all
+```
 
-![AI工作台](./images/导演工作台.png)
-![镜头与帧](./images/镜头与帧.png)
+### 4.3 方式二：分步启动
 
-### Phase 04: 制片导出
+**① 启动中间件**
 
-![制片导出](./images/成片导出.png)
+```bash
+docker compose up -d
+```
 
-### 资产管理
-
-![资产管理](./images/提示词管理.png)
-
-## 核心理念：关键帧驱动
-
-传统 Text-to-Video 往往难以稳定控制角色、构图和镜头起止画面。AI 漫剧工场引入动画与影视制作中的关键帧思路：
-
-1. **先画后动**：先生成镜头的起始帧与结束帧。
-2. **插值生成**：通过视频模型在关键帧之间生成运动过渡。
-3. **资产约束**：画面生成会参考角色定妆、服装变体和场景概念图，提升角色一致性与场景连续性。
-4. **流程化生产**：每个阶段都围绕同一个项目状态推进，减少反复复制提示词和手工整理资产的成本。
-
-## 核心功能模块
-
-### Phase 01: 剧情创作
-
-剧情创作阶段用于把故事、小说片段或短剧创意整理为可生产的结构化内容。
-
-- **智能剧本拆解**：输入故事大纲或正文，AI 自动生成剧本结构、角色、场景和分镜。
-- **分镜规划**：按目标时长和节奏生成镜头列表，包含动作、台词、画面提示词等信息。
-- **视觉化翻译**：将文字描述转为更适合图像生成模型使用的画面提示词。
-- **手动编辑**：支持编辑角色描述、场景描述、镜头动作、台词和分镜画面提示词。
-- **项目配置**：支持目标时长、语言、模型和视觉风格等基础参数。
-
-### Phase 02: 场景角色
-
-场景角色阶段用于沉淀后续画面生成需要使用的核心视觉资产。
-
-- **角色定妆**：为每个角色生成标准参考图。
-- **服装变体**：为角色维护多套造型，如日常、战斗、受伤、礼服等。
-- **场景概念图**：为故事中的关键场景生成环境参考图。
-- **图片上传**：支持手动上传角色、服装或场景图片作为参考资产。
-- **批量生成**：可以按角色或场景批量生成资产，减少重复操作。
-
-### Phase 03: AI工作台
-
-AI工作台是关键帧与视频片段制作的核心区域。
-
-- **镜头管理**：以网格和工作台形式管理所有镜头。
-- **关键帧生成**：为镜头生成起始帧和结束帧，便于控制构图和动作变化。
-- **上下文参考**：生成时会结合当前场景、角色定妆和服装变体，提升连续性。
-- **镜头拆分**：支持将长镜头拆分为子镜头，细化动作节奏。
-- **视频生成**：支持基于关键帧的视频生成流程，并记录渲染日志与状态。
-
-### Phase 04: 制片导出
-
-制片导出阶段用于集中预览、检查和下载项目成果。
-
-- **时间轴预览**：按镜头顺序查看已生成的视频片段。
-- **视频播放**：支持逐段预览镜头成片。
-- **渲染日志**：集中查看角色、场景、关键帧和视频生成记录。
-- **资产下载**：导出关键帧、视频片段和项目资产，便于进入后期剪辑流程。
-
-### 资产管理
-
-资产管理用于集中查看和调整项目中的提示词资产。
-
-- **角色提示词**：查看与编辑角色、服装变体相关提示词。
-- **场景提示词**：查看与编辑场景描述和图像提示词。
-- **关键帧提示词**：查看与编辑镜头关键帧提示词。
-- **视频提示词**：查看和调整视频生成描述。
-- **搜索与筛选**：按角色、场景、镜头和状态快速定位资产。
-
-## 技术架构
-
-- **前端框架**：React 19 + TypeScript + Vite
-- **界面样式**：Tailwind CSS + 工业风深色界面
-- **图标库**：lucide-react
-- **本地存储**：IndexedDB，用于保存项目、角色、场景、镜头和生成记录
-- **AI 接口**：GitCC API，兼容 OpenAI 风格接口
-- **图片/视频资产**：支持 Base64、远程 URL、关键帧图像与视频片段
-- **桌面端**：Electron + electron-builder
-- **容器部署**：Docker + Nginx
-
-## AI 能力
-
-项目默认围绕 GitCC API 提供的文本、图像与视频模型组织工作流：
-
-- **文本模型**：用于剧本拆解、角色/场景分析、提示词改写和视频描述生成。
-- **图像模型**：用于角色定妆、服装变体、场景概念图和关键帧生成。
-- **视频模型**：用于根据提示词、起始帧或起止关键帧生成视频片段。
-
-模型配置可以在应用内调整，适配不同上游模型名称、接口路径和参数。
-
-## 数据与隐私
-
-- 项目数据主要保存在浏览器 IndexedDB 中。
-- API Key 保存在本地配置中，用于调用 GitCC API。
-- 应用不依赖自建业务后端，开发和桌面端会通过代理解决浏览器跨域问题。
-- 若清理浏览器站点数据，项目内容也会被清除，请按需导出备份。
-
-## 项目启动
-
-### 本地开发
+**② 安装依赖（首次）**
 
 ```bash
 npm install
+```
+
+**③ 配置前端**
+
+```bash
+cp apps/web/.env.local.example apps/web/.env.local
+```
+
+`.env.local` 示例：
+
+```bash
+NEXT_PUBLIC_API_URL=http://localhost:7051
+```
+
+**④ 配置后端（可选，推荐）**
+
+```bash
+cp services/api/application-local.yml.example services/api/application-local.yml
+```
+
+在 `application-local.yml` 中填写 TokenFree / 方舟 Key，或在 Web 端「API Key 设置」中配置。
+
+**⑤ 启动 API**
+
+```bash
+npm run api:dev
+# 或
+cd services/api && mvn spring-boot:run -Dspring-boot.run.profiles=local
+```
+
+**⑥ 启动 Web**
+
+```bash
 npm run dev
 ```
 
-启动后访问终端输出的本地地址。Vite 开发环境会代理 `/api-proxy` 到 GitCC API，便于本地调试。
+### 4.4 验证安装
 
-### 构建生产版本
-
-```bash
-npm run build
-npm run preview
-```
-
-### Docker 部署
+| 检查项 | 地址 / 命令 |
+|--------|-------------|
+| API 健康检查 | http://localhost:7051/api/v1/health |
+| 前端首页 | http://localhost:7050 |
+| 创作画布 | http://localhost:7050/studio |
 
 ```bash
-docker-compose up -d --build
-docker-compose logs -f
-docker-compose down
+curl http://localhost:7051/api/v1/health
 ```
 
-默认通过 `3005` 端口访问。Compose 会生成 `ai-manga-studio:latest` 镜像、`ai-manga-studio-app` 容器和 `ai-manga-studio-network` 网络。Nginx 会托管前端静态文件，并代理 `/api-proxy` 到 GitCC API。
+期望返回 `"status":"UP"`。
 
-### Docker 命令方式
+![创作中心](docs/images/image-20260723-home.jpg)
+
+---
+
+## 5. Docker 部署
+
+> 完整步骤、生产 Nginx、环境变量与排障见 **[docs/部署指南.md](docs/部署指南.md)**。
+
+项目提供多套 Compose：
+
+| 文件 | 用途 |
+|------|------|
+| `docker-compose.yml` | 仅 PostgreSQL + Redis（本地开发） |
+| `docker-compose.full.yml` | **全栈**：Postgres + Redis + API + Web |
+
+### 5.1 使用 ACR 镜像部署（推荐）
+
+业务镜像已推送至 GCC 公开命名空间，服务器可直接拉取：
+
+| 服务 | 镜像地址 |
+|------|----------|
+| API | `gcc-registry.cn-hangzhou.cr.aliyuncs.com/gcc/ai-manju-api:latest` |
+| Web | `gcc-registry.cn-hangzhou.cr.aliyuncs.com/gcc/ai-manju-web:latest` |
 
 ```bash
-docker build -t ai-manga-studio .
-docker run -d -p 3005:80 --name ai-manga-studio-app ai-manga-studio
-docker logs -f ai-manga-studio-app
-docker stop ai-manga-studio-app
+# 1. 克隆代码
+git clone -b main https://www.gitcc.com/yi-ee/ai-manju.git
+cd ai-manju
+
+# 2. 准备环境变量（生产务必修改 JWT_SECRET 与数据库密码）
+export JWT_SECRET=your-production-jwt-secret-at-least-32-chars
+export TOKENFREE_API_KEY=sk-your-tokenfree-key
+export ARK_API_KEY=your-ark-seedance-key
+export API_BASE_URL=
+export IMAGE_TAG=latest
+
+# 3. 拉取并启动
+docker compose -f docker-compose.full.yml pull
+docker compose -f docker-compose.full.yml up -d
+
+# 4. 查看状态
+docker compose -f docker-compose.full.yml ps
 ```
 
-### 桌面端
+访问：
+
+- 前端：http://服务器:7050  
+- API：http://服务器:7051/api/v1/health  
+
+> **说明**：`docker-compose.full.yml` 中 `api` / `web` 的 `image` 已指向 ACR；本地仍保留 `build:` 段，便于开发机构建后推送。
+
+### 5.2 本地构建镜像（可选）
 
 ```bash
-npm run electron:dev
-npm run electron:build
-npm run electron:build:win
+docker compose -f docker-compose.full.yml build api web
+docker compose -f docker-compose.full.yml up -d
 ```
 
-- `electron:dev`：先构建前端，再启动 Electron 窗口。
-- `electron:build`：使用 electron-builder 生成桌面安装包。
-- Windows 安装包会以 `AI 漫剧工场` 为产品名输出到 `release/` 目录。
-- 桌面端内建本地 HTTP 服务，托管前端并代理 `/api-proxy` 到 GitCC API。
+构建 Web 时可选传入 `NEXT_PUBLIC_API_URL`（本地开发默认值）；生产环境优先使用运行时 `API_BASE_URL`。
 
-## 快速开始
+### 5.3 生产部署（Nginx + HTTPS）
 
-1. 启动应用后，在模型配置中填写 GitCC API Key。
-2. 进入 Phase 01「剧情创作」，输入故事创意并生成剧本和分镜。
-3. 进入 Phase 02「场景角色」，生成角色定妆、服装变体和场景图。
-4. 进入 Phase 03「AI工作台」，逐个生成关键帧和视频片段。
-5. 进入 Phase 04「制片导出」，预览并下载关键帧、视频和项目资产。
-6. 如需调整提示词，进入「资产管理」统一查看和编辑。
+生产环境推荐使用 `docker-compose.prod.yml`：Web/API 仅绑定 `127.0.0.1`，由宿主机 Nginx 反代并终止 TLS。
 
-## 常用命令
+| 文件 | 说明 |
+|------|------|
+| `docker-compose.prod.yml` | 生产 Compose（Postgres + Redis + API + Web） |
+| `deploy/nginx/printfilm.conf` | 宿主机 Nginx：`/` → Web，`/api/v1/` → API |
+| `.env.prod.example` | 生产环境变量模板 |
 
 ```bash
-npm install
-npm run dev
-npm run build
-npm run preview
-npm run electron:dev
-npm run electron:build
-docker-compose up -d --build
-docker-compose down
+# 服务器上
+cp .env.prod.example .env.prod   # 填写 JWT、AI Key、数据库密码等
+docker compose -f docker-compose.prod.yml pull
+docker compose -f docker-compose.prod.yml up -d
 ```
 
-## 目录概览
+**前端 API 地址**：通过 Web 容器环境变量 `API_BASE_URL` 注入（见 `apps/web/docker-entrypoint.sh`）。  
+留空表示浏览器走同源 `/api/v1`（需 Nginx 反代）；修改后 `docker compose restart web` 即可，**无需重建镜像**。
 
-```text
-.
-├── App.tsx
-├── components/
-│   ├── Dashboard.tsx
-│   ├── Sidebar.tsx
-│   ├── ModelConfig/
-│   ├── Onboarding/
-│   ├── StageScript/
-│   ├── StageAssets/
-│   ├── StageDirector/
-│   ├── StageExport/
-│   └── StagePrompts/
-├── electron/
-├── public/
-├── services/
-├── types/
-├── types.ts
-├── vite.config.ts
-├── Dockerfile
-├── docker-compose.yaml
-└── nginx.conf
+数据库同步（本地 → 生产）：
+
+```bash
+python scripts/sync_db_remote.py
 ```
 
-## 适合场景
+### 5.4 数据持久化
 
-- 短剧和漫剧前期开发
-- 动态漫画和分镜预演
-- 角色与场景视觉设定
-- AI视频片段批量生成
-- 创意原型验证和资产整理
+| 卷名 | 内容 |
+|------|------|
+| `postgres_data` | 数据库 |
+| `redis_data` | 缓存 |
+| `api_media` | 生成媒体文件 |
+| `api_uploads` | 用户上传文件 |
 
+---
 
-# MIT
+## 6. AI 模型 API 配置
 
-## Star History
+本平台**不依赖 GitCC API**，而是通过 **TokenFree**（文本/图像）与 **火山方舟 Seedance**（视频）调用模型。Key 可在前端设置，也可通过服务端环境变量提供回退。
 
-<a href="https://www.star-history.com/?repos=yuanzhongqiao%2Fdeep-printfilm&type=date&legend=top-left">
- <picture>
-   <source media="(prefers-color-scheme: dark)" srcset="https://api.star-history.com/chart?repos=yuanzhongqiao/deep-printfilm&type=date&theme=dark&legend=top-left" />
-   <source media="(prefers-color-scheme: light)" srcset="https://api.star-history.com/chart?repos=yuanzhongqiao/deep-printfilm&type=date&legend=top-left" />
-   <img alt="Star History Chart" src="https://api.star-history.com/chart?repos=yuanzhongqiao/deep-printfilm&type=date&legend=top-left" />
- </picture>
-</a>
+### 6.1 TokenFree（文本 / 图像）
+
+| 配置项 | 说明 |
+|--------|------|
+| 控制台 | https://www.tokenfree.com |
+| 环境变量 | `TOKENFREE_API_KEY` |
+| 前端 Header | `X-Tokenfree-Api-Key` |
+| 默认 Base URL | `https://www.tokenfree.com`（配置中**不要**加 `/v1` 后缀） |
+
+服务端默认模型（可在 `application.yml` 覆盖）：
+
+| 用途 | 默认模型 |
+|------|----------|
+| 对话/剧本 | `qwen-max` |
+| 文生图 | `nano-banana-2` |
+| 图编辑 | `nano-banana-2` |
+
+**配置方式（任选其一）：**
+
+```bash
+# 方式一：后端环境变量
+export TOKENFREE_API_KEY=sk-your-tokenfree-api-key
+
+# 方式二：application-local.yml
+# services/api/application-local.yml → printfilm.tokenfree.api-key
+
+# 方式三：Web 端「API Key 设置」（存浏览器 localStorage，请求时随 Header 发送）
+```
+
+### 6.2 火山方舟 Seedance（视频）
+
+| 配置项 | 说明 |
+|--------|------|
+| 控制台 | 火山方舟 / Seedance 控制台 |
+| 环境变量 | `ARK_API_KEY` |
+| 前端 Header | `X-Ark-Api-Key` |
+| 默认 Base URL | `https://ark.cn-beijing.volces.com` |
+
+默认视频模型：`doubao-seedance-2-0-260128`
+
+### 6.3 豆包语音（可选，角色音色）
+
+用于 DramaForge 角色音色样本，需在 `application-local.yml` 配置：
+
+```yaml
+printfilm:
+  speech:
+    app-id: "your-app-id"
+    access-key: your-access-token
+    secret-key: your-secret-key
+```
+
+### 6.4 验证 AI 连通性
+
+1. 登录 Web → 打开「API Key 设置」填写 Key  
+2. 在创作中心发起一次文生图或文生视频  
+3. 或在 DramaForge 工作流中触发「资产设计」任务，观察 SSE 进度  
+
+API 健康检查（不验证 AI Key）：
+
+```bash
+curl http://localhost:7051/api/v1/health
+```
+
+---
+
+## 7. 功能模块说明
+
+### 7.1 创作中心
+
+**路径**：`/`
+
+**功能概述**：首页可浏览，发起创作需登录。支持文生视频、图生视频、文生图、文本生成，展示最近任务卡片。
+
+| 元素 | 说明 |
+|------|------|
+| API Key 设置 | 配置 TokenFree / 方舟 Key |
+| 语言切换 | 顶栏「中 \| EN」 |
+| 登录跳转 | 未登录点击创作 → `/login` |
+
+![创作中心](docs/images/image-20260723-creator.jpg)
+
+### 7.2 项目管理
+
+**路径**：`/projects`
+
+**功能概述**：创建、编辑、删除项目；进入 DramaForge 流水线或画布工作流。
+
+| 元素 | 说明 |
+|------|------|
+| 新建项目 | 填写名称与描述 |
+| 进入工作流 | 跳转 `/studio/{projectId}` |
+| DramaForge 入口 | `?entry=dramaforge` |
+
+![项目管理](docs/images/image-20260723-projects.jpg)
+
+### 7.3 DramaForge 短剧流水线
+
+**路径**：`/studio/{projectId}`（工作流视图）
+
+**API 前缀**：`/api/v1/dramaforge/projects/{projectId}`
+
+**功能概述**：从文学文本/剧本到成片的全链路生产，任务异步执行，前端通过 SSE 订阅 `job_progress` / `job_completed` 等事件。
+
+| 阶段 | 说明 |
+|------|------|
+| 资产提取 | 从原文解析角色/场景/道具 |
+| 剧本生成 | LLM 生成结构化剧本并解析镜头 |
+| 资产设计 | 批量生成角色/场景/道具参考图 |
+| 分镜 | 为每个镜头生成 storyboard |
+| 镜头视频 | 调用 Seedance 提交视频任务 |
+| 视频同步 | 轮询方舟任务状态直至完成 |
+| 合成导出 | 拼接镜头、导出工程包 / 剪映草稿 |
+
+![DramaForge 工作流](docs/images/image-20260723-dramaforge.jpg)
+
+### 7.4 无限画布
+
+**路径**：`/studio/{id}`（画布模式）
+
+**功能概述**：React Flow 节点编辑器，支持文本/图像/视频节点，可从 DramaForge 流水线同步节点图。
+
+![画布编辑器](docs/images/image-20260723-canvas.jpg)
+
+### 7.5 资源库 / 模型市场 / 社区
+
+**路径**：`/library`、`/market`、`/community`
+
+当前为「即将上线」占位页，后续版本开放。
+
+### 7.6 用户认证
+
+**路径**：`/login`、`/register`
+
+| 接口 | 方法 | 说明 |
+|------|------|------|
+| `/api/v1/auth/register` | POST | 注册 |
+| `/api/v1/auth/login` | POST | 登录，返回 JWT |
+| `/api/v1/auth/me` | GET | 当前用户信息 |
+
+登录态保存在浏览器，API 请求携带 `Authorization: Bearer <token>`。
+
+---
+
+## 8. 典型业务流程
+
+### 8.1 快速体验：创作中心生视频
+
+```
+登录 → 配置 API Key → 选择「文生视频」→ 填写提示词 → 提交
+     → 任务列表轮询/刷新 → 预览或下载结果
+```
+
+### 8.2 短剧生产：DramaForge 全流程
+
+```
+创建项目 → 进入工作流 → 上传/粘贴原文
+        → 提取资产 → 生成剧本 → 批量资产设计
+        → 生成分镜 → 批量/单镜生成视频 → 等待同步完成
+        → 合成剧集 → 导出
+```
+
+任务由后端 `DramaForgeJobWorker` 每 5 秒调度，同一时刻仅一个 RUNNING 任务；进度与状态通过 SSE 推送。
+
+### 8.3 画布工作流
+
+```
+进入项目画布 → 添加节点（文本/图/视频）→ 连线配置
+            → 可选：从 DramaForge 同步节点图 → 保存项目 canvas JSON
+```
+
+---
+
+## 9. 系统管理
+
+**路径**：`/admin`（需管理员角色）
+
+| 子页面 | 路径 | 功能 |
+|--------|------|------|
+| 概览 | `/admin` | 统计仪表盘 |
+| 用户 | `/admin/users` | 用户列表与状态 |
+| 项目 | `/admin/projects` | 全站项目 |
+| 生成任务 | `/admin/generations` | 生成记录 |
+
+**API 前缀**：`/api/v1/admin/*`
+
+### 默认管理员账号
+
+首次启动且 `ADMIN_AUTO_CREATE=true` 时自动创建：
+
+| 字段 | 默认值 |
+|------|--------|
+| 邮箱 | `admin@printfilm.local` |
+| 密码 | `admin123456` |
+| 显示名 | 系统管理员 |
+
+> **生产环境务必**修改 `ADMIN_PASSWORD`、`ADMIN_EMAIL`，并设置强随机 `JWT_SECRET`。
+
+> 管理后台截图待补充；当前可先访问 `/admin` 使用默认管理员账号登录体验。
+
+---
+
+## 10. 日常运维
+
+### 10.1 常用命令
+
+```bash
+# 开发
+npm run dev              # 前端 :7050
+npm run api:dev          # 后端 :7051
+npm run api:build        # 打包 API JAR
+
+# Docker（仅中间件）
+npm run docker:up
+npm run docker:down
+
+# 全栈
+docker compose -f docker-compose.full.yml up -d
+docker compose -f docker-compose.full.yml logs -f api
+docker compose -f docker-compose.full.yml down
+```
+
+### 10.2 日志位置
+
+| 场景 | 位置 |
+|------|------|
+| 本地 API | 启动终端标准输出 |
+| Docker API | `docker compose -f docker-compose.full.yml logs api` |
+| 媒体文件 | `./data/media`、`./data/uploads`（或容器卷 `api_media` / `api_uploads`） |
+
+### 10.3 备份建议
+
+- 定期备份 PostgreSQL 卷 `postgres_data`
+- 备份 `api_media`、`api_uploads` 卷或本地 `data/` 目录
+
+### 10.4 镜像重新发布
+
+配置见 `.docker-publish.yml`，推送记录见 `.docker/镜像推送记录.md`。
+
+---
+
+## 11. 常见问题
+
+| 问题 | 可能原因 | 处理建议 |
+|------|----------|----------|
+| 前端无法调用 API | `API_BASE_URL` / Nginx 反代未配置 | 生产留空 `API_BASE_URL` 并确保 Nginx 转发 `/api/v1/` |
+| 登录报 403 | CORS 未包含生产域名 | 设置 `CORS_ALLOWED_ORIGINS=https://www.printfilm.com,...` |
+| 提示请配置 TokenFree Key | 未设置 Key | 前端 API Key 设置或环境变量 `TOKENFREE_API_KEY` |
+| 视频任务一直排队 | 未配置方舟 Key 或模型未开通 | 检查 `ARK_API_KEY` 与 Seedance 控制台 |
+| API 报 Hikari 连接池超时 | 批量任务并发占用连接 | 已优化事务边界；重启 API，避免同时发起过多长任务 |
+| SSE 断开日志 | 浏览器关闭连接 | 正常现象，不影响服务 |
+| 工作流页白屏闪一下 | 加载态样式 | 已统一暗色加载组件 |
+| Docker 部署后无法登录 | JWT/数据库为新实例 | 使用默认管理员或重新注册 |
+
+---
+
+## 附录
+
+### A. 环境变量速查
+
+| 变量 | 作用 | 默认值 |
+|------|------|--------|
+| `API_BASE_URL` | Web 运行时 API 基址（Docker 注入） | 留空=同源 |
+| `NEXT_PUBLIC_API_URL` | 本地 dev 构建时 API 基址 | `http://localhost:7051` |
+| `CORS_ALLOWED_ORIGINS` | API 允许的前端 Origin | 含 localhost 与 printfilm.com |
+| `JWT_SECRET` | JWT 签名密钥 | 开发内置（**生产必改**） |
+| `TOKENFREE_API_KEY` | TokenFree 服务端回退 Key | 空 |
+| `ARK_API_KEY` | 方舟 Seedance 服务端回退 Key | 空 |
+| `ADMIN_EMAIL` | 初始管理员邮箱 | `admin@printfilm.local` |
+| `ADMIN_PASSWORD` | 初始管理员密码 | `admin123456` |
+| `IMAGE_TAG` | Docker 镜像标签 | `latest` |
+
+数据库（`docker-compose.full.yml` 内置）：
+
+| 变量 | 值 |
+|------|-----|
+| 库名 | `printfilm` |
+| 用户 | `printfilm` |
+| 密码 | `printfilm_dev`（**生产必改**） |
+
+### B. ACR 镜像地址
+
+```
+gcc-registry.cn-hangzhou.cr.aliyuncs.com/gcc/ai-manju-api:latest
+gcc-registry.cn-hangzhou.cr.aliyuncs.com/gcc/ai-manju-web:latest
+```
+
+中间件使用公共镜像，不推送：
+
+```
+postgres:16-alpine
+redis:7-alpine
+```
+
+### C. 主要 API 路径
+
+| 模块 | 前缀 |
+|------|------|
+| 健康检查 | `GET /api/v1/health` |
+| 认证 | `/api/v1/auth` |
+| 项目 | `/api/v1/projects` |
+| 文本生成 | `/api/v1/text` |
+| 图像生成 | `/api/v1/image` |
+| 视频生成 | `/api/v1/video` |
+| 上传 | `/api/v1/uploads` |
+| 媒体 | `/api/v1/media` |
+| DramaForge | `/api/v1/dramaforge/projects/{id}` |
+| 管理 | `/api/v1/admin` |
+
+### D. 项目结构
+
+```
+ai-manju/
+├── apps/web/                  # Next.js 前端（Printfilm）
+├── services/api/              # Spring Boot API
+├── packages/shared-types/     # 共享类型
+├── docker-compose.yml         # 开发：Postgres + Redis
+├── docker-compose.full.yml    # 部署：全栈 + ACR 镜像
+├── docker-compose.prod.yml    # 生产：Nginx 反代 + 127.0.0.1
+├── deploy/nginx/printfilm.conf
+├── .env.prod.example
+├── .docker-publish.yml        # 镜像发布配置
+├── scripts/sync_db_remote.py  # 数据库同步到生产
+├── start.bat / stop.bat       # Windows 一键启停
+└── scripts/start-all.ps1      # 启停脚本
+```
+
+### E. 截图索引
+
+| 文件名 | 说明 |
+|--------|------|
+| `docs/images/image-20260723-login.jpg` | 登录页 |
+| `docs/images/image-20260723-home.jpg` | 创作中心首页 |
+| `docs/images/image-20260723-creator.jpg` | 创作中心 · 任务与工具箱 |
+| `docs/images/image-20260723-projects.jpg` | 项目管理 |
+| `docs/images/image-20260723-dramaforge.jpg` | DramaForge 流水线 |
+| `docs/images/image-20260723-canvas.jpg` | 无限画布工作流 |
+| `docs/images/image-20260717-gallery.png` | 全部创作弹窗 |
+| `docs/images/image-20260717-video-detail.png` | 视频生成任务详情 |
+| `docs/images/image-20260717-library-characters.png` | 素材库 · 角色 |
+| `docs/images/image-20260717-library-scenes.png` | 素材库 · 场景 |
+| `docs/images/image-20260717-library-props.png` | 素材库 · 道具 |
+
+---
+
+**Printfilm** · AI 短剧创作平台 · v0.1.0 · 2026-07-17
